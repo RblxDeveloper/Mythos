@@ -7,45 +7,91 @@
     <title>Mythos - Modern AI Storytelling</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cinzel:wght@700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       :root {
-        --bg-color: #fcfcfc;
-        --card-bg: #ffffff;
-        --primary: #000000;
-        --border-color: #f1f1f1;
+        --bg-color: #0f172a;
+        --paper-color: #fdfbf7;
+        --accent-color: #000000;
       }
 
       body {
         margin: 0;
-        font-family: 'Plus Jakarta Sans', sans-serif;
-        background-color: var(--bg-color);
-        color: #111111;
+        font-family: 'Inter', sans-serif;
+        background-color: #f8fafc;
+        color: #1e293b;
         -webkit-font-smoothing: antialiased;
-        overflow-x: hidden;
       }
       
-      .font-cinzel { font-family: 'Cinzel', serif; }
-      .font-crimson { font-family: 'Crimson Pro', serif; }
+      .font-inter { font-family: 'Inter', sans-serif; }
       
       .modern-card {
-        background: var(--card-bg);
-        border-radius: 2.5rem;
-        box-shadow: 0 4px 30px -10px rgba(0,0,0,0.03);
-        border: 1px solid var(--border-color);
+        background: #ffffff;
+        border-radius: 2rem;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+        border: 1px solid #f1f5f9;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
       }
 
-      .soft-input {
-        background-color: #f9f9f9;
-        border: 1px solid transparent;
-        border-radius: 1.5rem;
-        transition: all 0.2s ease;
+      .book-container {
+        perspective: 2500px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
-      
-      .soft-input:focus-within {
-        background-color: #ffffff;
-        border-color: #000000;
+
+      .paper-texture {
+        background-color: var(--paper-color);
+        background-image: url('https://www.transparenttextures.com/patterns/natural-paper.png');
+        position: relative;
+      }
+
+      .book-spine-divider {
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 40px;
+        transform: translateX(-50%);
+        background: linear-gradient(to right, 
+          rgba(0,0,0,0.12) 0%, 
+          rgba(0,0,0,0.03) 20%, 
+          rgba(0,0,0,0.1) 50%, 
+          rgba(0,0,0,0.03) 80%, 
+          rgba(0,0,0,0.12) 100%
+        );
+        z-index: 20;
+        pointer-events: none;
+      }
+
+      .drop-cap::first-letter {
+        float: left;
+        font-family: 'Inter', sans-serif;
+        font-weight: 900;
+        font-size: 3.5rem;
+        line-height: 0.8;
+        padding: 6px 12px 0 0;
+        color: var(--accent-color);
+      }
+
+      .reader-prose {
+        color: #2c3e50;
+        font-size: 1.15rem;
+        line-height: 1.6;
+        font-family: 'Inter', sans-serif;
+      }
+
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+      @keyframes fadeInScale {
+        from { opacity: 0; transform: scale(0.98); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .animate-book-page {
+        animation: fadeInScale 0.5s ease-out forwards;
       }
 
       input[type=range] {
@@ -56,51 +102,20 @@
       input[type=range]:focus { outline: none; }
       input[type=range]::-webkit-slider-runnable-track {
         width: 100%;
-        height: 4px;
+        height: 8px;
         cursor: pointer;
-        background: #eeeeee;
-        border-radius: 10px;
+        background: #e2e8f0;
+        border-radius: 4px;
       }
       input[type=range]::-webkit-slider-thumb {
-        height: 20px;
-        width: 20px;
+        height: 24px;
+        width: 24px;
         border-radius: 50%;
         background: #000000;
         cursor: pointer;
         -webkit-appearance: none;
         margin-top: -8px;
-        border: 3px solid #ffffff;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      }
-
-      .no-scrollbar::-webkit-scrollbar { display: none; }
-      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-      .paper-texture {
-        background-image: url('https://www.transparenttextures.com/patterns/natural-paper.png');
-      }
-
-      .drop-cap::first-letter {
-        float: left;
-        font-family: 'Cinzel', serif;
-        font-size: 4.5rem;
-        line-height: 0.8;
-        padding-top: 8px;
-        padding-right: 12px;
-        color: #000000;
-      }
-
-      @keyframes slideIn {
-        from { transform: translateY(20px); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
-      }
-      .animate-slide-up {
-        animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      }
-
-      .loading-glass {
-        background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: blur(16px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
       }
     </style>
   <script type="importmap">

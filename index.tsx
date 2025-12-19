@@ -18,6 +18,35 @@ import Sidebar from './components/Sidebar';
 const DB_NAME = 'MythosPersonalArchives';
 const STORE_NAME = 'chronicles';
 
+function decodeBase64(base64: string): Uint8Array {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function customDecodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number = 24000,
+  numChannels: number = 1,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
 const initDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 2);
@@ -74,20 +103,20 @@ const Dropdown = ({ label, value, options, onChange }: { label?: string, value: 
   }, []);
 
   return (
-    <div className="flex flex-col gap-2 mb-5" ref={containerRef}>
+    <div className="flex flex-col gap-2 mb-6" ref={containerRef}>
       {label && (
-        <label className="text-[10px] font-extrabold text-[#94a3b8] uppercase tracking-[0.15em] ml-1">
+        <label className="text-[11px] font-inter font-bold text-slate-500 uppercase tracking-widest ml-1">
           {label}
         </label>
       )}
       <div className="relative">
         <button 
           onClick={() => setIsOpen(!isOpen)} 
-          className={`w-full bg-[#f8fafc] text-[#0f172a] px-5 py-4 rounded-[1.25rem] flex items-center justify-between font-bold text-[12px] transition-all border border-transparent hover:bg-white hover:border-slate-200 ${isOpen ? 'bg-white border-slate-200 shadow-sm' : ''}`}
+          className={`w-full bg-slate-50 text-slate-900 px-6 py-4 rounded-2xl flex items-center justify-between font-inter font-bold text-sm transition-all border border-transparent hover:bg-white hover:border-slate-200 ${isOpen ? 'bg-white border-slate-200 shadow-sm' : ''}`}
         >
-          <span className="tracking-wide">{value.toUpperCase()}</span>
+          <span className="tracking-wide">{value}</span>
           <svg 
-            className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180 text-[#0d1117]' : ''}`} 
+            className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180 text-black' : ''}`} 
             fill="none" 
             viewBox="0 0 24 24" 
             stroke="currentColor"
@@ -96,15 +125,15 @@ const Dropdown = ({ label, value, options, onChange }: { label?: string, value: 
           </svg>
         </button>
         {isOpen && (
-          <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white shadow-[0_15px_35px_-10px_rgba(0,0,0,0.12)] rounded-[1.25rem] border border-slate-100 overflow-hidden z-[150] animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="max-h-64 overflow-y-auto no-scrollbar">
+          <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white shadow-2xl rounded-2xl border border-slate-100 overflow-hidden z-[150] animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="max-h-60 overflow-y-auto no-scrollbar">
               {options.map((opt) => (
                 <button 
                   key={opt} 
                   onClick={() => { onChange(opt); setIsOpen(false); }} 
-                  className={`w-full text-left px-6 py-4 text-[11px] font-black tracking-widest transition-all ${value === opt ? 'bg-[#0d1117] text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-[#0d1117]'}`}
+                  className={`w-full text-left px-6 py-4 text-sm font-inter font-bold tracking-tight transition-all ${value === opt ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50 hover:text-black'}`}
                 >
-                  {opt.toUpperCase()}
+                  {opt}
                 </button>
               ))}
             </div>
@@ -127,6 +156,7 @@ const App = () => {
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   const [genre, setGenre] = useState<Genre>(Genre.Fantasy);
+  // Fixed error in file index.tsx on line 159: Genre.Fantasy is not assignable to type Mood. Corrected to Mood.Epic.
   const [mood, setMood] = useState<Mood>(Mood.Epic);
   const [style, setStyle] = useState<StoryStyle>(StoryStyle.OilPainting);
   const [voice, setVoice] = useState<Voice>(Voice.Male);
@@ -136,16 +166,41 @@ const App = () => {
 
   useEffect(() => {
     getFromDB().then(data => setStories(data.sort((a, b) => b.createdAt - a.createdAt)));
-  }, []);
+    const initAudio = () => {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      }
+    };
+    window.addEventListener('mousedown', initAudio, { once: true });
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (view !== 'reader' || !activeStory) return;
+      if (e.key === 'ArrowRight') {
+        setCurrentPageIndex(p => Math.min(activeStory.pages.length - 1, p + 1));
+      } else if (e.key === 'ArrowLeft') {
+        setCurrentPageIndex(p => Math.max(0, p - 1));
+      } else if (e.key === 'Escape') {
+        setView('library');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('mousedown', initAudio);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [view, activeStory]);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
-    setGenProgress({ current: 0, total: pageCount, step: 'Drafting narrative...' });
+    setGenProgress({ current: 0, total: pageCount, step: 'Dreaming up your story...' });
     try {
+      // Use the 'mood' state value selected by the user instead of hardcoded 'Mood.Epic'
       const result = await generateStoryContent(genre, mood, pageCount, cast, plot, style);
       const newStory: Story = {
         id: Date.now().toString(),
         title: result.title,
+        // Use the 'mood' state value selected by the user instead of hardcoded 'Mood.Epic'
         genre, mood, style, plot, cast,
         pages: [],
         createdAt: Date.now(),
@@ -153,7 +208,7 @@ const App = () => {
       };
       const finalPages = [];
       for(let i = 0; i < result.pages.length; i++) {
-        setGenProgress({ current: i + 1, total: pageCount, step: `Chapter ${i + 1} of ${pageCount}...` });
+        setGenProgress({ current: i + 1, total: pageCount, step: `Creating Chapter ${i + 1} of ${pageCount}...` });
         const imgUrl = await generateImageForPage(result.pages[i].imagePrompt, genre);
         const audio = await generateNarration(result.pages[i].text, voice);
         finalPages.push({ ...result.pages[i], imageUrl: imgUrl, audioData: audio });
@@ -162,13 +217,16 @@ const App = () => {
       await saveToDB(newStory);
       setStories([newStory, ...stories]);
       setActiveStory(newStory);
+      setCurrentPageIndex(0);
       setView('reader');
-    } catch (e) { alert("Manifestation failed. Please try again later."); }
-    finally { setIsGenerating(false); }
+    } catch (e) { 
+      console.error(e);
+      alert("Something went wrong while manifesting your story. Please check your connection and try again."); 
+    } finally { setIsGenerating(false); }
   };
 
   const deleteStory = async (id: string) => {
-    if (confirm("Delete this chronicle?")) {
+    if (confirm("Are you sure you want to delete this story forever?")) {
       await removeFromDB(id);
       setStories(stories.filter(s => s.id !== id));
       if (activeStory?.id === id) setView('library');
@@ -182,76 +240,73 @@ const App = () => {
   };
 
   const renderGenerator = () => (
-    <div className="max-w-7xl mx-auto py-10 px-8 lg:px-12 pt-28 lg:pt-16 flex flex-col gap-10 pb-20">
+    <div className="max-w-7xl mx-auto py-12 px-6 lg:px-12 pt-24 lg:pt-16 flex flex-col gap-12 pb-32">
+      <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-4 duration-700">
+        <h1 className="text-4xl lg:text-5xl font-inter font-black text-slate-900 tracking-tight">Create your Legend</h1>
+        <p className="text-lg text-slate-500 font-inter font-medium">Configure your world, characters, and plot.</p>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-        
-        {/* Left: Configuration Panel */}
-        <div className="lg:col-span-4 modern-card p-10 flex flex-col animate-slide-up bg-white shadow-xl border-slate-100">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-12 bg-[#0d1117] rounded-[1.25rem] flex items-center justify-center shadow-lg">
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-black tracking-tight text-[#0d1117]">Configuration</h2>
-          </div>
+        <div className="lg:col-span-4 modern-card p-10 flex flex-col bg-white">
+          <h2 className="text-xl font-inter font-bold mb-8 text-slate-900 flex items-center gap-3">
+             <span className="p-2 bg-slate-900 text-white rounded-lg text-lg">⚙️</span>
+             Configuration
+          </h2>
 
           <div className="flex flex-col">
             <Dropdown label="Genre" value={genre} options={Object.values(Genre)} onChange={setGenre} />
             <Dropdown label="Mood" value={mood} options={Object.values(Mood)} onChange={setMood} />
-            <Dropdown label="Art Style" value={style} options={Object.values(StoryStyle)} onChange={setStyle} />
+            <Dropdown label="Visual Style" value={style} options={Object.values(StoryStyle)} onChange={setStyle} />
             <Dropdown label="Voice" value={voice} options={Object.values(Voice)} onChange={setVoice} />
           </div>
 
-          <div className="mt-2 mb-8">
-            <div className="flex justify-between items-center mb-5">
-              <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Length</span>
-              <span className="bg-[#0d1117] text-white px-4 py-1 rounded-xl text-[10px] font-black">{pageCount} Pages</span>
+          <div className="mt-4 mb-10">
+            <div className="flex justify-between items-center mb-6">
+              <span className="text-[11px] font-inter font-bold text-slate-500 uppercase tracking-widest">Story Length</span>
+              <span className="bg-slate-100 text-slate-900 px-4 py-1.5 rounded-full text-xs font-inter font-bold">{pageCount} Pages</span>
             </div>
-            <div className="px-1">
-              <input type="range" min="3" max="10" value={pageCount} onChange={(e) => setPageCount(parseInt(e.target.value))} />
-            </div>
+            <input type="range" min="3" max="10" value={pageCount} onChange={(e) => setPageCount(parseInt(e.target.value))} />
           </div>
 
           <button 
             onClick={handleGenerate} 
-            className="w-full bg-[#0d1117] text-white py-5 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.25em] shadow-2xl hover:bg-slate-800 transition-all active:scale-[0.98] mt-2"
+            className="w-full bg-slate-900 text-white py-5 rounded-2xl font-inter font-bold text-sm uppercase tracking-widest shadow-xl hover:bg-black transition-all active:scale-[0.98] mt-2 group"
           >
-            Create Story
+            Manifest Story
+            <span className="ml-2 group-hover:translate-x-1 inline-block transition-transform">→</span>
           </button>
         </div>
 
-        {/* Right: Protagonists & Plot */}
         <div className="lg:col-span-8 flex flex-col gap-10">
-          <div className="modern-card p-12 animate-slide-up bg-white shadow-xl border-slate-100" style={{ animationDelay: '0.1s' }}>
-            <h3 className="text-2xl font-black mb-10 tracking-tight text-[#0d1117]">Protagonists</h3>
+          <div className="modern-card p-12 bg-white">
+            <h3 className="text-2xl font-inter font-bold mb-10 text-slate-900">Protagonists</h3>
             <div className="flex flex-col gap-6 mb-10">
               {cast.map((c, i) => (
-                <div key={c.id} className="relative p-7 bg-[#f8fafc] border border-slate-100 rounded-[1.75rem] group animate-in fade-in slide-in-from-left-2">
+                <div key={c.id} className="relative p-8 bg-slate-50 border border-slate-100 rounded-3xl group animate-in fade-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${i * 100}ms` }}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">Name</label>
+                    <div className="flex flex-col gap-3">
+                      <label className="text-[10px] font-inter font-bold text-slate-400 uppercase tracking-widest">Hero's Name</label>
                       <input 
-                        placeholder="e.g. Orion" 
+                        placeholder="e.g. Atlas" 
                         value={c.name} 
                         onChange={(e) => setCast(cast.map(char => char.id === c.id ? { ...char, name: e.target.value } : char))} 
-                        className="w-full bg-white border border-slate-100 px-5 py-3.5 rounded-2xl font-bold text-[#0d1117] outline-none focus:border-black focus:ring-1 focus:ring-black/5 transition-all text-base placeholder:text-slate-200 shadow-sm" 
+                        className="w-full bg-white border border-slate-200 px-6 py-4 rounded-2xl font-inter font-bold text-slate-900 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-all shadow-sm" 
                       />
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">Role</label>
+                    <div className="flex flex-col gap-3">
+                      <label className="text-[10px] font-inter font-bold text-slate-400 uppercase tracking-widest">Role or Class</label>
                       <input 
-                        placeholder="e.g. Brave Explorer" 
+                        placeholder="e.g. Rogue Knight" 
                         value={c.role} 
                         onChange={(e) => setCast(cast.map(char => char.id === c.id ? { ...char, role: e.target.value } : char))} 
-                        className="w-full bg-white border border-slate-100 px-5 py-3.5 rounded-2xl font-bold text-[#0d1117] outline-none focus:border-black focus:ring-1 focus:ring-black/5 transition-all text-base placeholder:text-slate-200 shadow-sm" 
+                        className="w-full bg-white border border-slate-200 px-6 py-4 rounded-2xl font-inter font-bold text-slate-900 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-all shadow-sm" 
                       />
                     </div>
                   </div>
                   {cast.length > 1 && (
                     <button 
                       onClick={() => removeCastMember(c.id)}
-                      className="absolute -top-3 -right-3 w-8 h-8 bg-white border border-slate-100 text-slate-300 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all shadow-md opacity-0 group-hover:opacity-100"
+                      className="absolute -top-3 -right-3 w-9 h-9 bg-white border border-slate-200 text-slate-400 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-all shadow-lg opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
@@ -263,20 +318,20 @@ const App = () => {
             </div>
             <button 
               onClick={() => setCast([...cast, { id: Date.now().toString(), name: '', role: '' }])} 
-              className="w-full py-5 border border-dashed border-slate-200 rounded-[2rem] font-black text-[11px] text-slate-400 uppercase tracking-[0.25em] hover:bg-slate-50 hover:text-slate-600 transition-all active:scale-[0.99] shadow-sm"
+              className="w-full py-5 border-2 border-dashed border-slate-200 rounded-3xl font-inter font-bold text-xs text-slate-400 uppercase tracking-widest hover:bg-slate-50 hover:text-slate-600 transition-all active:scale-[0.99]"
             >
-              + Add character
+              + Add another character
             </button>
           </div>
 
-          <div className="modern-card p-12 animate-slide-up flex flex-col bg-white shadow-xl border-slate-100" style={{ animationDelay: '0.2s' }}>
-            <h3 className="text-2xl font-black mb-8 tracking-tight text-[#0d1117]">Starting Plot</h3>
-            <div className="bg-[#f8fafc] p-8 rounded-[2rem] min-h-[250px] w-full border border-slate-50 flex flex-col focus-within:bg-white focus-within:border-slate-200 transition-all duration-300 shadow-sm">
+          <div className="modern-card p-12 flex flex-col bg-white">
+            <h3 className="text-2xl font-inter font-bold mb-8 text-slate-900">Initial Plot Prompt</h3>
+            <div className="bg-slate-50 p-8 rounded-3xl min-h-[250px] w-full border border-slate-100 flex flex-col focus-within:bg-white focus-within:border-slate-200 transition-all duration-300">
               <textarea 
-                placeholder="Give us a hook or leave it blank..." 
+                placeholder="Briefly describe how your story begins, or let the AI weave its own tale..." 
                 value={plot} 
                 onChange={(e) => setPlot(e.target.value)} 
-                className="w-full h-full min-h-[180px] bg-transparent outline-none resize-none font-bold text-slate-600 text-base leading-relaxed placeholder:text-slate-300 no-scrollbar flex-grow" 
+                className="w-full h-full min-h-[180px] bg-transparent outline-none resize-none font-inter font-medium text-slate-700 text-lg leading-relaxed placeholder:text-slate-300 no-scrollbar flex-grow" 
               />
             </div>
           </div>
@@ -286,45 +341,40 @@ const App = () => {
   );
 
   const renderLibrary = () => (
-    <div className="max-w-6xl mx-auto py-12 px-6 lg:px-10 pt-24 lg:pt-16">
-      <header className="mb-10 animate-slide-up">
-        <h1 className="text-3xl font-black tracking-tight text-[#0d1117]">Collection</h1>
-        <p className="text-slate-400 text-[9px] font-black uppercase tracking-[0.4em] mt-1">Saved Books</p>
+    <div className="max-w-7xl mx-auto py-12 px-6 lg:px-12 pt-24 lg:pt-16 pb-32">
+      <header className="mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
+        <h1 className="text-4xl lg:text-5xl font-inter font-black text-slate-900 tracking-tight">Your Library</h1>
+        <p className="text-lg text-slate-500 font-inter font-medium mt-2">Relive your adventures.</p>
       </header>
 
       {stories.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 animate-slide-up text-center px-6 border-2 border-dashed border-slate-100 rounded-[2rem] bg-white/40">
-          <div className="w-16 h-16 bg-white rounded-[1.25rem] flex items-center justify-center text-3xl mb-6 shadow-sm border border-slate-50">
-            ✨
-          </div>
-          <h3 className="text-xl font-black tracking-tight text-[#0d1117]">Shelf empty</h3>
-          <p className="text-slate-400 font-bold mt-2 text-sm max-w-xs leading-relaxed">
-            Manifest your first chronicle to begin.
-          </p>
+        <div className="flex flex-col items-center justify-center py-32 text-center modern-card bg-white border-dashed border-2">
+          <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-4xl mb-6 border border-slate-100">📚</div>
+          <h3 className="text-2xl font-inter font-bold text-slate-900">Your shelf is empty</h3>
           <button 
             onClick={() => setView('generator')} 
-            className="mt-8 px-8 py-4 bg-[#0d1117] text-white rounded-[1.5rem] font-black text-[10px] tracking-[0.2em] uppercase shadow-lg hover:scale-105 transition-all"
+            className="mt-10 px-10 py-4 bg-slate-900 text-white rounded-2xl font-inter font-bold text-sm tracking-widest uppercase shadow-xl hover:scale-105 transition-all"
           >
-            Create Now
+            Manifest Story
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
           {stories.map((story, i) => (
-            <div key={story.id} className="modern-card overflow-hidden flex flex-col group animate-slide-up bg-white shadow-sm border-slate-100" style={{ animationDelay: `${i * 0.1}s` }}>
-              <div className="h-60 relative overflow-hidden bg-slate-50">
-                <img src={story.pages[0]?.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[2s] ease-out" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                <div className="absolute bottom-6 left-6 right-6 text-white">
-                  <span className="text-[9px] font-black tracking-[0.2em] uppercase opacity-60 mb-1.5 block">{story.genre}</span>
-                  <h3 className="text-xl font-black line-clamp-2 leading-tight tracking-tight">{story.title}</h3>
+            <div key={story.id} className="modern-card overflow-hidden flex flex-col group bg-white animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${i * 100}ms` }}>
+              <div className="h-64 relative overflow-hidden">
+                <img src={story.pages[0]?.imageUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/20 to-transparent" />
+                <div className="absolute bottom-6 left-6 right-6">
+                  <span className="text-[10px] font-inter font-bold tracking-widest uppercase text-white/50 mb-2 block">{story.genre}</span>
+                  <h3 className="text-2xl font-inter font-bold text-white line-clamp-2 leading-tight tracking-tight">{story.title}</h3>
                 </div>
               </div>
-              <div className="p-6 flex-grow flex flex-col gap-3">
-                <button onClick={() => { setActiveStory(story); setView('reader'); }} className="w-full bg-[#0d1117] text-white py-3.5 rounded-[1rem] font-black text-[10px] uppercase tracking-widest active:scale-95 transition-transform">Open Book</button>
+              <div className="p-8 flex-grow flex flex-col gap-4">
+                <button onClick={() => { setActiveStory(story); setCurrentPageIndex(0); setView('reader'); }} className="w-full bg-slate-900 text-white py-4 rounded-xl font-inter font-bold text-xs uppercase tracking-widest active:scale-95 transition-transform shadow-lg">Open Book</button>
                 <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => exportToPDF(story)} className="bg-slate-50 text-slate-500 py-3 rounded-[1rem] font-black text-[8px] uppercase tracking-widest hover:bg-slate-100">PDF</button>
-                  <button onClick={() => deleteStory(story.id)} className="bg-red-50 text-red-400 py-3 rounded-[1rem] font-black text-[8px] uppercase tracking-widest hover:bg-red-500 hover:text-white">Delete</button>
+                  <button onClick={() => exportToPDF(story)} className="bg-slate-50 text-slate-600 py-3.5 rounded-xl font-inter font-bold text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-colors">Export PDF</button>
+                  <button onClick={() => deleteStory(story.id)} className="bg-red-50 text-red-500 py-3.5 rounded-xl font-inter font-bold text-[10px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">Delete</button>
                 </div>
               </div>
             </div>
@@ -337,74 +387,173 @@ const App = () => {
   const renderReader = () => {
     const page = activeStory?.pages[currentPageIndex];
     if (!page) return null;
+
+    const handleNarrationPlay = async () => {
+      if (isNarrating) {
+        audioSourceRef.current?.stop();
+        setIsNarrating(false);
+        return;
+      }
+      if (page.audioData) {
+        try {
+          if (!audioContextRef.current) {
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+          }
+          const ctx = audioContextRef.current;
+          const audioBytes = decodeBase64(page.audioData);
+          const audioBuffer = await customDecodeAudioData(audioBytes, ctx, 24000, 1);
+          
+          const src = ctx.createBufferSource();
+          src.buffer = audioBuffer;
+          src.connect(ctx.destination);
+          src.onended = () => setIsNarrating(false);
+          src.start();
+          audioSourceRef.current = src;
+          setIsNarrating(true);
+        } catch (e) {
+          setIsNarrating(false);
+        }
+      }
+    };
+
     return (
-      <div className="fixed inset-0 bg-white z-[100] flex flex-col animate-in fade-in duration-700">
-        <div className="h-16 border-b border-slate-50 px-6 flex items-center justify-between">
-          <button onClick={() => setView('library')} className="text-slate-400 font-black text-[9px] tracking-[0.4em] uppercase hover:text-black transition-all">← Back</button>
-          <h2 className="text-black font-black text-[10px] uppercase tracking-[0.3em] truncate px-4">{activeStory?.title}</h2>
-          <button onClick={() => exportToPDF(activeStory!)} className="px-5 py-2 bg-[#0d1117] text-white rounded-full font-black text-[9px] tracking-widest uppercase shadow-lg">Export PDF</button>
+      <div className="fixed inset-0 bg-[#000000] z-[100] flex flex-col animate-in fade-in duration-700 overflow-y-auto lg:overflow-hidden font-inter">
+        {/* Header Section */}
+        <div className="shrink-0 h-20 px-6 lg:px-12 flex items-center justify-between text-white/90 z-[110] relative bg-black/50 backdrop-blur-md">
+          <button 
+            onClick={() => setView('library')} 
+            className="flex items-center gap-3 text-[11px] font-inter font-bold tracking-widest uppercase hover:text-white transition-all bg-white/10 hover:bg-white/20 px-6 py-3 rounded-2xl backdrop-blur-xl border border-white/10"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7"/></svg>
+            Library
+          </button>
+          
+          <div className="hidden lg:flex flex-col items-center">
+            <h2 className="font-inter font-bold text-2xl tracking-tight text-white">{activeStory?.title}</h2>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[10px] font-inter font-bold text-white/40 tracking-widest uppercase">{activeStory?.genre} • Chapter {currentPageIndex + 1}</span>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => exportToPDF(activeStory!)} 
+            className="px-6 py-3 bg-white text-slate-900 rounded-2xl font-inter font-bold text-[11px] tracking-widest uppercase shadow-2xl hover:scale-105 active:scale-95 transition-all"
+          >
+            Export PDF
+          </button>
         </div>
-        <div className="flex-grow flex items-center justify-center p-4 lg:p-8">
-          <div className="w-full h-full max-w-[1500px] max-h-[800px] bg-white rounded-[2.5rem] shadow-2xl border border-slate-50 flex flex-col lg:flex-row overflow-hidden relative">
-             <div className="w-full lg:w-1/2 h-2/5 lg:h-full bg-slate-50 overflow-hidden relative">
-                <img src={page.imageUrl} className="w-full h-full object-cover animate-in fade-in duration-1000" />
-                <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-black/20 to-transparent pointer-events-none hidden lg:block" />
+
+        {/* Responsive Content Spread */}
+        <div className="flex-grow flex items-center justify-center p-4 lg:p-12 relative">
+          <div className="w-full h-auto lg:h-full max-w-[1600px] max-h-none lg:max-h-[850px] bg-white rounded-xl flex flex-col lg:flex-row overflow-hidden relative shadow-[0_50px_100px_-20px_rgba(0,0,0,0.8)] mb-20 lg:mb-0">
+             
+             {/* LEFT PAGE: IMAGE */}
+             <div className="w-full lg:w-1/2 h-auto lg:h-full bg-black overflow-hidden relative">
+                <img 
+                  key={`img-${currentPageIndex}`}
+                  src={page.imageUrl} 
+                  className="w-full h-full object-contain lg:object-cover animate-book-page shadow-inner" 
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-black/10 via-transparent to-black/5 pointer-events-none" />
              </div>
-             <div className="w-full lg:w-1/2 h-3/5 lg:h-full p-8 lg:p-16 overflow-y-auto no-scrollbar paper-texture relative">
-                <div className="flex justify-between items-center mb-8">
-                   <span className="text-[9px] font-black text-slate-300 tracking-[0.5em] uppercase">Folio {currentPageIndex + 1}</span>
+
+             <div className="hidden lg:block book-spine-divider"></div>
+
+             {/* RIGHT PAGE: TEXT */}
+             <div className="w-full lg:w-1/2 h-auto lg:h-full p-8 lg:p-20 paper-texture relative flex flex-col animate-book-page overflow-hidden">
+                <div className="flex justify-between items-start mb-10 shrink-0">
+                   <div className="flex flex-col">
+                     <span className="text-[11px] font-inter font-bold text-slate-400 uppercase tracking-widest mb-1">Story Page</span>
+                     <span className="text-3xl font-inter italic font-bold text-slate-900 opacity-20">Chapter {currentPageIndex + 1}</span>
+                   </div>
+                   
                    {page.audioData && (
-                     <button onClick={() => {
-                       if (isNarrating) { audioSourceRef.current?.stop(); setIsNarrating(false); }
-                       else {
-                          const ctx = new AudioContext();
-                          const buf = new Uint8Array(atob(page.audioData!).split("").map(c => c.charCodeAt(0))).buffer;
-                          ctx.decodeAudioData(buf).then(ab => {
-                            const src = ctx.createBufferSource(); src.buffer = ab; src.connect(ctx.destination);
-                            src.start(); setIsNarrating(true); src.onended = () => setIsNarrating(false);
-                            audioSourceRef.current = src;
-                          });
-                       }
-                     }} className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all ${isNarrating ? 'bg-[#0d1117] text-white scale-110' : 'bg-white text-black hover:scale-105 border border-slate-100'}`}>
+                     <button 
+                       onClick={handleNarrationPlay} 
+                       className={`w-14 h-14 lg:w-16 lg:h-16 rounded-full flex items-center justify-center shadow-2xl transition-all ${isNarrating ? 'bg-slate-900 text-white scale-110' : 'bg-white text-slate-900 hover:scale-110 border border-slate-100'}`}
+                     >
                        {isNarrating ? (
-                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                         <div className="flex gap-1.5 items-end h-5">
+                            <div className="w-1.5 bg-white animate-[bounce_0.6s_infinite] h-4"></div>
+                            <div className="w-1.5 bg-white animate-[bounce_0.8s_infinite] h-6"></div>
+                            <div className="w-1.5 bg-white animate-[bounce_0.7s_infinite] h-5"></div>
+                         </div>
                        ) : (
-                         <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                         <svg className="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                        )}
                      </button>
                    )}
                 </div>
-                <div className="prose prose-lg prose-slate font-crimson text-[#0d1117] drop-cap leading-relaxed animate-in slide-in-from-bottom-2 duration-500">
+
+                {/* TEXT CONTAINER - FITS CONTENT ON DESKTOP, SCROLLS NATURALLY ON MOBILE */}
+                <div className="reader-prose drop-cap flex-grow overflow-y-auto lg:overflow-hidden no-scrollbar pr-2 font-inter">
                   <ReactMarkdown>{page.text}</ReactMarkdown>
+                </div>
+
+                <div className="mt-12 pt-8 border-t border-slate-200 flex flex-col items-center shrink-0">
+                   <div className="text-sm font-inter italic font-bold text-slate-400">Page {currentPageIndex + 1} of {activeStory!.pages.length}</div>
                 </div>
              </div>
           </div>
-          <button disabled={currentPageIndex === 0} onClick={() => setCurrentPageIndex(p => p - 1)} className="absolute left-6 w-14 h-14 rounded-full bg-white shadow-xl flex items-center justify-center text-xl font-black disabled:opacity-0 transition-all hover:scale-105 border border-slate-50">←</button>
-          <button disabled={currentPageIndex === activeStory!.pages.length - 1} onClick={() => setCurrentPageIndex(p => p + 1)} className="absolute right-6 w-14 h-14 rounded-full bg-white shadow-xl flex items-center justify-center text-xl font-black disabled:opacity-0 transition-all hover:scale-105 border border-slate-50">→</button>
+
+          {/* Nav Buttons Overlay */}
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-2 lg:px-12 pointer-events-none z-50">
+            <button 
+              disabled={currentPageIndex === 0} 
+              onClick={() => setCurrentPageIndex(p => p - 1)} 
+              className="w-14 h-14 lg:w-20 lg:h-20 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-2xl shadow-2xl flex items-center justify-center text-white disabled:opacity-0 transition-all hover:scale-110 border border-white/20 pointer-events-auto group"
+            >
+              <svg className="w-8 h-8 transform group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            
+            <button 
+              disabled={currentPageIndex === activeStory!.pages.length - 1} 
+              onClick={() => setCurrentPageIndex(p => p + 1)} 
+              className="w-14 h-14 lg:w-20 lg:h-20 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-2xl shadow-2xl flex items-center justify-center text-white disabled:opacity-0 transition-all hover:scale-110 border border-white/20 pointer-events-auto group"
+            >
+              <svg className="w-8 h-8 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Simplified Progress Footer */}
+        <div className="shrink-0 h-28 px-8 lg:px-12 flex flex-col items-center justify-center gap-4 text-white/30 bg-black">
+           <div className="flex gap-2 lg:gap-4">
+             {activeStory!.pages.map((_, idx) => (
+               <button 
+                 key={idx}
+                 onClick={() => setCurrentPageIndex(idx)}
+                 className={`h-2 transition-all duration-500 rounded-full ${currentPageIndex === idx ? 'w-16 bg-white' : 'w-4 bg-white/10 hover:bg-white/30'}`}
+               />
+             ))}
+           </div>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen lg:pl-64 bg-[#fcfcfc] overflow-visible">
+    <div className="min-h-screen lg:pl-64 bg-slate-50 overflow-x-hidden font-inter">
       <Sidebar currentView={view} onViewChange={setView} />
       <main className="min-h-screen">
         {view === 'generator' && renderGenerator()}
         {view === 'library' && renderLibrary()}
         {view === 'reader' && renderReader()}
       </main>
+      
       {isGenerating && (
-        <div className="fixed inset-0 z-[500] bg-white/95 backdrop-blur-xl flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-500">
-          <div className="w-40 h-40 relative mb-12">
-            <svg className="w-full h-full animate-spin duration-[4s]" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="46" fill="none" stroke="#f4f4f4" strokeWidth="2" />
-              <circle cx="50" cy="50" r="46" fill="none" stroke="#0d1117" strokeWidth="4" strokeDasharray="100 200" strokeLinecap="round" />
+        <div className="fixed inset-0 z-[500] bg-white/95 backdrop-blur-2xl flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-500">
+          <div className="w-48 h-48 relative mb-12">
+            <svg className="w-full h-full animate-[spin_5s_linear_infinite]" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="46" fill="none" stroke="#f1f5f9" strokeWidth="2" />
+              <circle cx="50" cy="50" r="46" fill="none" stroke="#000000" strokeWidth="4" strokeDasharray="120 200" strokeLinecap="round" />
             </svg>
-            <div className="absolute inset-0 flex items-center justify-center text-5xl animate-pulse">📖</div>
+            <div className="absolute inset-0 flex items-center justify-center text-6xl animate-pulse">✨</div>
           </div>
-          <h2 className="text-3xl font-black tracking-tight uppercase mb-4 text-[#0d1117]">Manifesting...</h2>
-          <p className="text-xl font-crimson italic text-slate-400 max-w-lg leading-relaxed px-6">"{genProgress.step}"</p>
+          <h2 className="text-4xl font-inter font-bold text-slate-900 mb-4 uppercase tracking-tight">Manifesting...</h2>
+          <div className="bg-slate-50 px-8 py-4 rounded-2xl border border-slate-100 shadow-sm">
+            <p className="text-xl font-inter font-medium text-slate-600 leading-relaxed">"{genProgress.step}"</p>
+          </div>
         </div>
       )}
     </div>
