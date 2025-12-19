@@ -1,0 +1,5 @@
+{
+  "name": "Mythos - The Magical Storybook Creator",
+  "description": "Generate personalized, multi-page illustrated stories using Gemini AI. Features a premium book-style reader, persistent library, and PDF export.",
+  "requestFramePermissions": []
+}
