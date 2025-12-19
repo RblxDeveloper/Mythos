@@ -303,7 +303,7 @@ const App = () => {
                     <div className="flex flex-col gap-3">
                       <label className="text-[10px] font-inter font-bold text-slate-400 uppercase tracking-widest">Hero's Name</label>
                       <input 
-                        placeholder="e.g. Atlas" 
+                        placeholder="e.g. Omar" 
                         value={c.name} 
                         onChange={(e) => setCast(cast.map(char => char.id === c.id ? { ...char, name: e.target.value } : char))} 
                         className="w-full bg-white border border-slate-200 px-6 py-4 rounded-2xl font-inter font-bold text-slate-900 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-all shadow-sm" 
@@ -312,7 +312,7 @@ const App = () => {
                     <div className="flex flex-col gap-3">
                       <label className="text-[10px] font-inter font-bold text-slate-400 uppercase tracking-widest">Role or Class</label>
                       <input 
-                        placeholder="e.g. Rogue Knight" 
+                        placeholder="e.g. Prince" 
                         value={c.role} 
                         onChange={(e) => setCast(cast.map(char => char.id === c.id ? { ...char, role: e.target.value } : char))} 
                         className="w-full bg-white border border-slate-200 px-6 py-4 rounded-2xl font-inter font-bold text-slate-900 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-all shadow-sm" 
