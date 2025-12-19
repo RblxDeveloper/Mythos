@@ -190,6 +190,7 @@ const App = () => {
     };
   }, [view, activeStory]);
 
+  // Disable body scrolling while the manifestation happens
   useEffect(() => {
     if (isGenerating) {
       document.body.style.overflow = 'hidden';
@@ -446,9 +447,9 @@ const App = () => {
     };
 
     return (
-      <div className="fixed inset-0 bg-[#000000] z-[100] flex flex-col animate-in fade-in duration-700 overflow-y-auto lg:overflow-hidden font-inter">
+      <div className="fixed inset-0 bg-[#000000] z-[100] flex flex-col animate-in fade-in duration-700 overflow-y-auto font-inter">
         {/* Header Section */}
-        <div className="shrink-0 h-20 px-6 lg:px-12 flex items-center justify-between text-white/90 z-[110] relative bg-black/50 backdrop-blur-md">
+        <div className="shrink-0 h-20 px-6 lg:px-12 flex items-center justify-between text-white/90 z-[110] sticky top-0 bg-black/50 backdrop-blur-md">
           <button 
             onClick={() => setView('library')} 
             className="flex items-center gap-3 text-[11px] font-inter font-bold tracking-widest uppercase hover:text-white transition-all bg-white/10 hover:bg-white/20 px-6 py-3 rounded-2xl backdrop-blur-xl border border-white/10"
@@ -473,11 +474,11 @@ const App = () => {
         </div>
 
         {/* Responsive Content Spread */}
-        <div className="flex-grow flex items-center justify-center p-4 lg:p-12 relative">
-          <div className="w-full h-auto lg:h-full max-w-[1600px] max-h-none lg:max-h-[850px] bg-white rounded-xl flex flex-col lg:flex-row overflow-hidden relative shadow-[0_50px_100px_-20px_rgba(0,0,0,0.8)] mb-20 lg:mb-0">
+        <div className="flex-grow flex items-center justify-center p-4 lg:p-12 relative min-h-fit">
+          <div className="w-full h-auto max-w-[1600px] bg-white rounded-xl flex flex-col lg:flex-row overflow-hidden relative shadow-[0_50px_100px_-20px_rgba(0,0,0,0.8)] mb-20 lg:mb-0">
              
              {/* LEFT PAGE: IMAGE */}
-             <div className="w-full lg:w-1/2 h-auto lg:h-full bg-black overflow-hidden relative">
+             <div className="w-full lg:w-1/2 h-auto min-h-[400px] lg:min-h-[600px] bg-black overflow-hidden relative">
                 <img 
                   key={`img-${currentPageIndex}`}
                   src={page.imageUrl} 
@@ -489,7 +490,7 @@ const App = () => {
              <div className="hidden lg:block book-spine-divider"></div>
 
              {/* RIGHT PAGE: TEXT */}
-             <div className="w-full lg:w-1/2 h-auto lg:h-full p-8 lg:p-20 paper-texture relative flex flex-col animate-book-page overflow-hidden">
+             <div className="w-full lg:w-1/2 h-auto p-8 lg:p-20 paper-texture relative flex flex-col animate-book-page">
                 <div className="flex justify-between items-start mb-10 shrink-0">
                    <div className="flex flex-col">
                      <span className="text-[11px] font-inter font-bold text-slate-400 uppercase tracking-widest mb-1">Story Page</span>
@@ -514,8 +515,8 @@ const App = () => {
                    )}
                 </div>
 
-                {/* TEXT CONTAINER - FITS CONTENT ON DESKTOP, SCROLLS NATURALLY ON MOBILE */}
-                <div className="reader-prose drop-cap flex-grow overflow-y-auto lg:overflow-hidden no-scrollbar pr-2 font-inter">
+                {/* TEXT CONTAINER - ALLOWS NATURAL GROWTH AND SCROLLING */}
+                <div className="reader-prose drop-cap flex-grow font-inter">
                   <ReactMarkdown>{page.text}</ReactMarkdown>
                 </div>
 
@@ -547,7 +548,7 @@ const App = () => {
         </div>
 
         {/* Simplified Progress Footer */}
-        <div className="shrink-0 h-28 px-8 lg:px-12 flex flex-col items-center justify-center gap-4 text-white/30 bg-black">
+        <div className="shrink-0 h-28 px-8 lg:px-12 flex flex-col items-center justify-center gap-4 text-white/30 bg-black sticky bottom-0">
            <div className="flex gap-2 lg:gap-4">
              {activeStory!.pages.map((_, idx) => (
                <button 

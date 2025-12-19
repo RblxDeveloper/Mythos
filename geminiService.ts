@@ -35,6 +35,7 @@ export const generateStoryContent = async (
     2. "pages": Exactly ${pageCount} objects with "text" (Markdown) and "imagePrompt" (Detailed description).
   `;
 
+  // Explicitly using gemini-3-flash-preview as requested for core story generation
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: "Manifest the chronicle.",
@@ -103,7 +104,12 @@ export const generateNarration = async (text: string, voice: Voice): Promise<str
       },
     });
     return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-  } catch (error) {
+  } catch (error: any) {
+    // Gracefully handle rate limits (429) or other TTS errors to ensure story generation continues
+    if (error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('QUOTA')) {
+      console.warn("Narration quota exhausted. Proceeding without speech.");
+      return undefined;
+    }
     console.warn("TTS Failed:", error);
     return undefined;
   }

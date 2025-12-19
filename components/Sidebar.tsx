@@ -63,7 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) => {
       {/* Desktop Monochrome Sidebar */}
       <aside className="hidden lg:flex w-64 bg-white border-r border-slate-50 h-screen flex-col p-10 fixed left-0 top-0 z-40 font-inter">
         <div className="flex flex-col items-center text-center mb-20">
-          <div className="w-14 h-14 bg-black rounded-[1.25rem] flex items-center justify-center shadow-2xl shrink-0 border-4 border-white mb-4 text-white">
+          <div className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center shadow-2xl shrink-0 border-4 border-white mb-4 text-white">
             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
@@ -78,7 +78,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) => {
               key={item.id}
               onClick={() => onViewChange(item.id)}
               className={`
-                w-full flex items-center gap-4 px-6 py-5 rounded-[2.5rem] transition-all group relative 
+                w-full flex items-center gap-4 px-6 py-5 rounded-[1.5rem] transition-all group relative 
                 ${currentView === item.id 
                   ? 'bg-black text-white shadow-2xl scale-[1.02]' 
                   : 'hover:bg-slate-50 text-slate-300 opacity-40 hover:opacity-100'}
