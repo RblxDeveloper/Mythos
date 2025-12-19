@@ -156,7 +156,6 @@ const App = () => {
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   const [genre, setGenre] = useState<Genre>(Genre.Fantasy);
-  // Fixed error in file index.tsx on line 159: Genre.Fantasy is not assignable to type Mood. Corrected to Mood.Epic.
   const [mood, setMood] = useState<Mood>(Mood.Epic);
   const [style, setStyle] = useState<StoryStyle>(StoryStyle.OilPainting);
   const [voice, setVoice] = useState<Voice>(Voice.Male);
@@ -191,16 +190,25 @@ const App = () => {
     };
   }, [view, activeStory]);
 
+  useEffect(() => {
+    if (isGenerating) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isGenerating]);
+
   const handleGenerate = async () => {
     setIsGenerating(true);
     setGenProgress({ current: 0, total: pageCount, step: 'Dreaming up your story...' });
     try {
-      // Use the 'mood' state value selected by the user instead of hardcoded 'Mood.Epic'
       const result = await generateStoryContent(genre, mood, pageCount, cast, plot, style);
       const newStory: Story = {
         id: Date.now().toString(),
         title: result.title,
-        // Use the 'mood' state value selected by the user instead of hardcoded 'Mood.Epic'
         genre, mood, style, plot, cast,
         pages: [],
         createdAt: Date.now(),
@@ -249,7 +257,12 @@ const App = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
         <div className="lg:col-span-4 modern-card p-10 flex flex-col bg-white">
           <h2 className="text-xl font-inter font-bold mb-8 text-slate-900 flex items-center gap-3">
-             <span className="p-2 bg-slate-900 text-white rounded-lg text-lg">⚙️</span>
+             <span className="p-2 bg-slate-900 text-white rounded-lg">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+             </span>
              Configuration
           </h2>
 
@@ -361,7 +374,11 @@ const App = () => {
 
       {stories.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-32 text-center modern-card bg-white border-dashed border-2">
-          <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-4xl mb-6 border border-slate-100">📚</div>
+          <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mb-6 border border-slate-100">
+            <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+          </div>
           <h3 className="text-2xl font-inter font-bold text-slate-900">Your shelf is empty</h3>
           <button 
             onClick={() => setView('generator')} 
@@ -503,28 +520,29 @@ const App = () => {
                 </div>
 
                 <div className="mt-12 pt-8 border-t border-slate-200 flex flex-col items-center shrink-0">
-                   <div className="text-sm font-inter italic font-bold text-slate-400">Page {currentPageIndex + 1} of {activeStory!.pages.length}</div>
+                   <div className="flex items-center gap-6">
+                      <button 
+                        disabled={currentPageIndex === 0} 
+                        onClick={() => setCurrentPageIndex(p => p - 1)} 
+                        className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-900 disabled:opacity-30 hover:bg-slate-200 transition-all active:scale-90"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7"/></svg>
+                      </button>
+                      
+                      <div className="text-sm font-inter italic font-bold text-slate-400">
+                        Page {currentPageIndex + 1} of {activeStory!.pages.length}
+                      </div>
+
+                      <button 
+                        disabled={currentPageIndex === activeStory!.pages.length - 1} 
+                        onClick={() => setCurrentPageIndex(p => p + 1)} 
+                        className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-900 disabled:opacity-30 hover:bg-slate-200 transition-all active:scale-90"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7"/></svg>
+                      </button>
+                   </div>
                 </div>
              </div>
-          </div>
-
-          {/* Nav Buttons Overlay */}
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-2 lg:px-12 pointer-events-none z-50">
-            <button 
-              disabled={currentPageIndex === 0} 
-              onClick={() => setCurrentPageIndex(p => p - 1)} 
-              className="w-14 h-14 lg:w-20 lg:h-20 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-2xl shadow-2xl flex items-center justify-center text-white disabled:opacity-0 transition-all hover:scale-110 border border-white/20 pointer-events-auto group"
-            >
-              <svg className="w-8 h-8 transform group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7"/></svg>
-            </button>
-            
-            <button 
-              disabled={currentPageIndex === activeStory!.pages.length - 1} 
-              onClick={() => setCurrentPageIndex(p => p + 1)} 
-              className="w-14 h-14 lg:w-20 lg:h-20 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-2xl shadow-2xl flex items-center justify-center text-white disabled:opacity-0 transition-all hover:scale-110 border border-white/20 pointer-events-auto group"
-            >
-              <svg className="w-8 h-8 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7"/></svg>
-            </button>
           </div>
         </div>
 
@@ -560,7 +578,11 @@ const App = () => {
               <circle cx="50" cy="50" r="46" fill="none" stroke="#f1f5f9" strokeWidth="2" />
               <circle cx="50" cy="50" r="46" fill="none" stroke="#000000" strokeWidth="4" strokeDasharray="120 200" strokeLinecap="round" />
             </svg>
-            <div className="absolute inset-0 flex items-center justify-center text-6xl animate-pulse">✨</div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <svg className="w-12 h-12 text-slate-900 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+              </svg>
+            </div>
           </div>
           <h2 className="text-4xl font-inter font-bold text-slate-900 mb-4 uppercase tracking-tight">Manifesting...</h2>
           <div className="bg-slate-50 px-8 py-4 rounded-2xl border border-slate-100 shadow-sm">
