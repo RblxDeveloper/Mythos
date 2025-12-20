@@ -190,16 +190,12 @@ const App = () => {
     };
   }, [view, activeStory]);
 
-  // Disable body scrolling while the manifestation happens
   useEffect(() => {
     if (isGenerating) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
     }
-    return () => {
-      document.body.style.overflow = '';
-    };
   }, [isGenerating]);
 
   const handleGenerate = async () => {
@@ -228,9 +224,9 @@ const App = () => {
       setActiveStory(newStory);
       setCurrentPageIndex(0);
       setView('reader');
-    } catch (e) { 
+    } catch (e: any) { 
       console.error(e);
-      alert("Something went wrong while manifesting your story. Please check your connection and try again."); 
+      alert("Manifestation failed. Please try again in a few moments.");
     } finally { setIsGenerating(false); }
   };
 
@@ -448,7 +444,6 @@ const App = () => {
 
     return (
       <div className="fixed inset-0 bg-[#000000] z-[100] flex flex-col animate-in fade-in duration-700 overflow-y-auto font-inter">
-        {/* Header Section */}
         <div className="shrink-0 h-20 px-6 lg:px-12 flex items-center justify-between text-white/90 z-[110] sticky top-0 bg-black/50 backdrop-blur-md">
           <button 
             onClick={() => setView('library')} 
@@ -473,11 +468,9 @@ const App = () => {
           </button>
         </div>
 
-        {/* Responsive Content Spread */}
-        <div className="flex-grow flex items-center justify-center p-4 lg:p-12 relative min-h-fit">
-          <div className="w-full h-auto max-w-[1600px] bg-white rounded-xl flex flex-col lg:flex-row overflow-hidden relative shadow-[0_50px_100px_-20px_rgba(0,0,0,0.8)] mb-20 lg:mb-0">
+        <div className="flex-grow flex flex-col items-center p-4 lg:p-12 relative">
+          <div className="w-full h-auto max-w-[1600px] bg-white rounded-xl flex flex-col lg:flex-row overflow-hidden relative shadow-[0_50px_100px_-20px_rgba(0,0,0,0.8)] mb-10">
              
-             {/* LEFT PAGE: IMAGE */}
              <div className="w-full lg:w-1/2 h-auto min-h-[400px] lg:min-h-[600px] bg-black overflow-hidden relative">
                 <img 
                   key={`img-${currentPageIndex}`}
@@ -489,7 +482,6 @@ const App = () => {
 
              <div className="hidden lg:block book-spine-divider"></div>
 
-             {/* RIGHT PAGE: TEXT */}
              <div className="w-full lg:w-1/2 h-auto p-8 lg:p-20 paper-texture relative flex flex-col animate-book-page">
                 <div className="flex justify-between items-start mb-10 shrink-0">
                    <div className="flex flex-col">
@@ -515,7 +507,6 @@ const App = () => {
                    )}
                 </div>
 
-                {/* TEXT CONTAINER - ALLOWS NATURAL GROWTH AND SCROLLING */}
                 <div className="reader-prose drop-cap flex-grow font-inter">
                   <ReactMarkdown>{page.text}</ReactMarkdown>
                 </div>
@@ -545,19 +536,18 @@ const App = () => {
                 </div>
              </div>
           </div>
-        </div>
 
-        {/* Simplified Progress Footer - Non-sticky, naturally at the bottom of content */}
-        <div className="w-full h-28 px-8 lg:px-12 flex flex-col items-center justify-center gap-4 text-white/30 bg-black mt-10">
-           <div className="flex gap-2 lg:gap-4">
-             {activeStory!.pages.map((_, idx) => (
-               <button 
-                 key={idx}
-                 onClick={() => setCurrentPageIndex(idx)}
-                 className={`h-2 transition-all duration-500 rounded-full ${currentPageIndex === idx ? 'w-16 bg-white' : 'w-4 bg-white/10 hover:bg-white/30'}`}
-               />
-             ))}
-           </div>
+          <div className="w-full flex flex-col items-center justify-center gap-4 py-10">
+             <div className="flex gap-2 lg:gap-4">
+               {activeStory!.pages.map((_, idx) => (
+                 <button 
+                   key={idx}
+                   onClick={() => setCurrentPageIndex(idx)}
+                   className={`h-2 transition-all duration-500 rounded-full ${currentPageIndex === idx ? 'w-16 bg-white' : 'w-4 bg-white/10 hover:bg-white/30'}`}
+                 />
+               ))}
+             </div>
+          </div>
         </div>
       </div>
     );
